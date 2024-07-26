@@ -1,4 +1,10 @@
-import { INodeType, INodeTypeDescription } from 'n8n-workflow';
+import {
+	INodeType,
+	INodeTypeDescription,
+	INodeExecutionData,
+	IExecuteFunctions,
+	ICredentialDataDecryptedObject
+} from 'n8n-workflow';
 
 export class HttpBin implements INodeType {
 	description: INodeTypeDescription = {
@@ -17,7 +23,11 @@ export class HttpBin implements INodeType {
 		credentials: [
 			{
 				name: 'httpbinApi',
-				required: false,
+				required: true,
+			},
+			{
+				name: 'httpbintriggerApi',
+				required: true,
 			},
 		],
 		properties: [
@@ -206,8 +216,8 @@ export class HttpBin implements INodeType {
 								method: 'POST',
 								url: `https://dev.mymatrixapp.com/crmApi/message/update`,
 								headers: {
-									'companyId': '={{$credentials.companyId}}',
-									'apiKey': '={{$credentials.apiKey}}',
+									'companyId': '={{$credentials.httpbintriggerApi.companyId}}',
+									'apiKey': '={{$credentials.httpbintriggerApi.apiKey}}',
 								},
 								body: {
 									message_id: '={{$parameter["messageId"]}}',
@@ -365,4 +375,44 @@ export class HttpBin implements INodeType {
 			},
 		],
 	};
+
+	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+		// Get the input data
+		const items = this.getInputData();
+		const returnData: INodeExecutionData[] = [];
+
+		// Loop through all items
+		for (let i = 0; i < items.length; i++) {
+			// Get resource and operation parameters
+			// const resource = this.getNodeParameter('resource', i) as string;
+			const operation = this.getNodeParameter('operation', i) as string;
+
+			// Prepare the request options based on the resource and operation
+			let requestOptions = this.getNodeParameter('routing', i) as any;
+
+			// Determine the correct credentials based on the operation
+			let credentials: ICredentialDataDecryptedObject | undefined;
+			if (operation === 'updateMessageTranslation') {
+				credentials = await this.getCredentials('httpbintriggerApi') as ICredentialDataDecryptedObject;
+				requestOptions.headers = {
+					'triggerKey': credentials.key,
+				};
+			} else {
+				credentials = await this.getCredentials('httpbinApi') as ICredentialDataDecryptedObject;
+				requestOptions.headers = {
+					'companyId': credentials.companyId,
+					'apiKey': credentials.apiKey,
+				};
+			}
+
+			// Make the API request using the helper
+			const responseData = await this.helpers.request(requestOptions);
+
+			// Push the response data to returnData
+			returnData.push({ json: responseData });
+		}
+
+		// Return the formatted data
+		return [returnData];
+	}
 }

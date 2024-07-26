@@ -7,7 +7,6 @@ import {
 export class HttpBinApi implements ICredentialType {
 	name = 'httpbinApi';
 	displayName = 'CT Coach Dev API';
-	documentationUrl = 'https://httpbin.org';
 	properties: INodeProperties[] = [
 		{
 			displayName: 'Company ID',
